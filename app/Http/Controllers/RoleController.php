@@ -33,8 +33,6 @@ class RoleController extends Controller
     public function create()
     {
         $permissions = Permission::all();
-        // $permission_groups = User::getPermissionGroup();
-
         return view('role.create',compact('permissions'));
     }
 
@@ -81,7 +79,10 @@ class RoleController extends Controller
     public function edit($id)
     {
 
-        return view('role.edit');
+        $permissions = Permission::all();
+        $role = Role::with('permissions')->find($id);
+        $ids = $role->permissions()->pluck('id')->toArray();
+        return view('role.edit',compact('permissions','role','ids'));
     }
 
     /**
@@ -91,20 +92,19 @@ class RoleController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update($request, $id)
+    public function update(Request $request,Role $role)
     {
-        abort_if(!userCan('role.update'), 403);
+        // abort_if(!userCan('role.update'), 403);
 
-        try {
-            UpdateRole::update($request, $role);
+            $request->validate([
+                'name' => "required|unique:roles,name, $role->id"
+            ]);
 
-            session()->flush('success', 'Role Updated!');
+            $role->update(['name' => $request->name]);
+            $role->syncPermissions($request->permissions);
+
+            session()->flash('success', 'Role Updated!');
             return back();
-        } catch (\Throwable $th) {
-
-            session()->flush('Error', 'Something is wrong');
-            return back();
-        }
     }
 
     /**
@@ -113,20 +113,12 @@ class RoleController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Role $role)
     {
         // abort_if(!userCan('role.delete'), 403);
 
-        try {
-            if (!is_null($role)) {
-                $role->delete();
-            }
-
-            session()->flush('success', 'Role Deleted!');
-            return back();
-        } catch (\Throwable $th) {
-            session()->flush('error', 'Something is wrong');
-            return back();
-        }
+        $role->delete();
+        session()->flash('success', 'Role Deleted!');
+        return back();  
     }
 }
